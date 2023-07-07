@@ -3,6 +3,7 @@ import os
 from settings import get_dirs, get_base_path
 
 logging.basicConfig(
+    filename='logs/status.log',
     format='%(asctime)s %(levelname)-8s %(message)s',
     level=logging.INFO,
     datefmt='%Y-%m-%d %H:%M:%S')
@@ -10,11 +11,9 @@ logging.basicConfig(
 
 def write_to_log(log_path, content):
     BASE_PATH = get_base_path()
-    print(BASE_PATH)
+    print(f"BASE PATH IS: {BASE_PATH}")
     DIRS = get_dirs(BASE_PATH)
-    print(DIRS)
-    with open(os.path.join(DIRS[2], log_path), 'w') as f:
-        f.write(str(logging.info(content)))
+    print(f"THE LIST OF DIRECTORIES: {DIRS}")
     logging.info(content)
 
 
