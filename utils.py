@@ -1,7 +1,6 @@
 import logging
 import os
 from datetime import datetime
-
 from settings import get_dirs, get_base_path
 
 
@@ -17,14 +16,3 @@ def write_to_log(content):
     DIRS = get_dirs(BASE_PATH)
     print(f"THE LIST OF DIRECTORIES: {DIRS}")
     logging.info(content)
-
-
-def write_to_file(file_path, content):
-    with open(file_path, 'w') as f:
-        f.write(content)
-
-
-def read_from_file(file_path):
-    with open(file_path, 'r') as f:
-        content = f.read()
-    return content
