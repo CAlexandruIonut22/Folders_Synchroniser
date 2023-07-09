@@ -1,54 +1,36 @@
 import os
 import shutil
+import time
 from filecmp import dircmp
 
+import schedule
+
 from settings import get_base_path
-from utils import write_to_log
+from utils import *
 
 
-def print_diff_files(dcmp):
-    for name in dcmp.diff_files:
-        print("diff_file %s found in %s and %s" % (name, dcmp.left,
-                                                   dcmp.right))
-    for sub_dcmp in dcmp.subdirs.values():
-        print_diff_files(sub_dcmp)
+def sync_folders(dircmp):
+    if "source" not in os.listdir(dircmp.right):
+        shutil.copytree(dircmp.left, os.path.join(dircmp.right, "source"))  # copy original folder
+        write_to_log(f"Copied {dircmp.left} to the {dircmp.right} dir")
 
+    src_only_list = src_only(dircmp)  # get list of items ONLY in the source folders
+    print(src_only_list)
+    # if len(src_only_list) >= 1 or len(unsynced_files(dcmp)) > 0:  # copy files and subdirs from left to right
 
-# def get_diff_list(src_list, repl_list, src_path, repl_path):
-#     diff_list = []
-#     for i in src_list:
-#         if os.path.isdir(src_path) and os.path.isdir(repl_path) and i not in repl_list:  # one way checking
-#             diff_list.append(i)
-#     return diff_list
-
-
-def unsynced_files(dcmp):
-    return dcmp.diff_files  # files in both a and b but have different contents
-
-
-def get_identical_list(dcmp):
-    return dcmp.same_files  # files in both a and b that are identical
-
-
-def src_only(dcmp):
-    return dcmp.left_only  # files and subdirs only in a and not b
-
-
-def get_common_dirs(dcmp):
-    return dcmp.common_dirs
-
-
-def sync_folders(dcmp):
-    if "source" not in os.listdir(dcmp.right):
-        shutil.copytree(dcmp.left, os.path.join(dcmp.right, "source"))  # copy original folder
-    src_list = src_only(dcmp)
-    # print(len(src_list))
-    if len(src_list) > 1:
-        # copy files and subdirs from left to right
-        for i in src_list:
-            shutil.copy2(dcmp.left + "/" + i, dcmp.right + "/" + i)
-            print(f"Coppied: {i}")
-    elif len(src_list) == 0:
+    # NEED TO CHECK FOR SYNC BASED ON CONTENTS WHEN THEY ARE DIFFERENT!
+    if len(src_only_list) >= 1:  # copy files and subdirs from left to right
+        for i in src_only_list:
+            # print(i)
+            if os.path.isfile(os.path.join(dircmp.left, i)) and i not in os.listdir(dircmp.right):  # Copy files
+                # print("FILE")
+                shutil.copy2(dircmp.left + "/" + i, dircmp.right + "/" + i)
+                write_to_log(f"Copied {i} to the {dircmp.right} dir")
+            elif os.path.isdir(os.path.join(dircmp.left, i)) and i not in os.listdir(dircmp.right):  # Copy folders
+                # print("FOLDER")
+                shutil.copytree(os.path.join(dircmp.left, i), os.path.join(dircmp.right, i))
+                write_to_log(f"Copied {os.path.join(dircmp.left, i)} to {dircmp.right} ")
+    elif len(src_only_list) == 0:
         write_to_log("Folders are synced!")
 
 
@@ -82,11 +64,18 @@ repl_name = replicaFolder.name
 
 dcmp = dircmp(src_path, repl_path, ignore=None, hide=None)
 
-# print(get_identical_list(dcmp=dcmp))
-# print(unsynced_files(dcmp=dcmp))
-# print(src_only(dcmp=dcmp))
+# Main call
+src_path = str(input("Path of the source folder: "))
+repl_path = str(input("Path of the replica folder: "))
+log_path = str(input("Path of the log folder: "))
+sync_interval = str(input("Interval of sync: "))  # format input string to differentiate Seconds/Minutes/Hours/Days
 
-sync_folders(dcmp=dcmp)
+# Scheduler
+schedule.every(1).minute.do(lambda: sync_folders(dcmp))
 
-# print(get_diff_list(src_list, repl_list, src_path, repl_path))
-# write_to_log("Hello")
+while True:
+    # Checks whether a scheduled task
+    # is pending to run or not
+    schedule.run_pending()
+    time.sleep(4)
+    # NEED TO CHECK FOR SYNC BASED ON CONTENTS WHEN THEY ARE DIFFERENT!
