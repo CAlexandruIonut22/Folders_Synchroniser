@@ -1,0 +1,4 @@
+1) Give the absolute file paths for the two existing folders considered source folder and replica folder
+2) Give the absolute file path for the log path, this one doesn't have to be existent and it can be created where you specify it to be.
+3) Specify the time interval for which the script can run , it can be either X seconds, X minutes or X hours where X is a number greater or equal than 1 
+example: "2 minutes" , "3 hours", "5 seconds".
