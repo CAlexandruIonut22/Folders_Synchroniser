@@ -1,37 +1,61 @@
-import os
 import shutil
 import time
 from filecmp import dircmp
 
 import schedule
 
-from settings import get_base_path
 from utils import *
 
+BASE_PATH = os.getcwd()
 
-def sync_folders(dircmp):
+
+def sync_folders(dircmp, log_path):
     if "source" not in os.listdir(dircmp.right):
         shutil.copytree(dircmp.left, os.path.join(dircmp.right, "source"))  # copy original folder
-        write_to_log(f"Copied {dircmp.left} to the {dircmp.right} dir")
+        write_to_log(f"Copied original {dircmp.left} to the {dircmp.right} dir", log_path)
 
-    src_only_list = src_only(dircmp)  # get list of items ONLY in the source folders
-    print(src_only_list)
-    # if len(src_only_list) >= 1 or len(unsynced_files(dcmp)) > 0:  # copy files and subdirs from left to right
+    repl_only_list = dcmp.right_only
+    src_only_list = dircmp.left_only  # get list of items ONLY in the source folders
+    unsync_list = dircmp.diff_files
 
-    # NEED TO CHECK FOR SYNC BASED ON CONTENTS WHEN THEY ARE DIFFERENT!
-    if len(src_only_list) >= 1:  # copy files and subdirs from left to right
+    if len(repl_only_list) > 1 and 'source' in repl_only_list:  # remove what is in replica and not in source
+
+        for i in repl_only_list:
+            if os.path.isfile(os.path.join(dircmp.right, i)):  # Copy files
+                os.remove(os.path.join(dircmp.right, i))
+                write_to_log(f"Removed {i} from the {dircmp.right} dir", log_path)
+            elif os.path.isdir(os.path.join(dircmp.right, i)) and i != "source":  # Copy folders
+                shutil.rmtree(os.path.join(dircmp.right, i), ignore_errors=True)
+                write_to_log(f"Removed {os.path.join(dircmp.right, i)} from the {dircmp.right} ", log_path)
+
+    if len(src_only_list) >= 1:  # copy files and subdirs from source to replica
         for i in src_only_list:
-            # print(i)
-            if os.path.isfile(os.path.join(dircmp.left, i)) and i not in os.listdir(dircmp.right):  # Copy files
-                # print("FILE")
-                shutil.copy2(dircmp.left + "/" + i, dircmp.right + "/" + i)
-                write_to_log(f"Copied {i} to the {dircmp.right} dir")
-            elif os.path.isdir(os.path.join(dircmp.left, i)) and i not in os.listdir(dircmp.right):  # Copy folders
-                # print("FOLDER")
+            if os.path.isfile(os.path.join(dircmp.left, i)):
+                # Copy files
+                shutil.copy(dircmp.left + "/" + i, dircmp.right + "/" + i)
+                write_to_log(f"Copied {i} to the {dircmp.right} dir", log_path)
+            elif os.path.isdir(os.path.join(dircmp.left, i)) and not os.path.exists(os.path.join(dircmp.right, i)):
+                # Copy folders
                 shutil.copytree(os.path.join(dircmp.left, i), os.path.join(dircmp.right, i))
-                write_to_log(f"Copied {os.path.join(dircmp.left, i)} to {dircmp.right} ")
-    elif len(src_only_list) == 0:
-        write_to_log("Folders are synced!")
+                write_to_log(f"Copied {os.path.join(dircmp.left, i)} to {dircmp.right} ", log_path)
+
+    if len(unsync_list) >= 1:
+        for i in unsync_list:
+            if os.path.isfile(os.path.join(dircmp.left, i)):
+                # Copy files
+                with open(dircmp.left + "/" + i, 'r') as f:
+                    with open(dircmp.right + "/" + i, "w") as f1:
+                        for line in f:
+                            f1.write(line)
+                # shutil.copy2(dircmp.left + "/" + i, dircmp.right + "/" + i)
+                write_to_log(f"Updated {i} to the {dircmp.right} dir", log_path)
+            elif os.path.isdir(os.path.join(dircmp.left, i)) and not os.path.exists(os.path.join(dircmp.right, i)):
+                # Copy folders
+                shutil.copytree(os.path.join(dircmp.left, i), os.path.join(dircmp.right, i))
+                write_to_log(f"Updated {os.path.join(dircmp.left, i)} to {dircmp.right} ", log_path)
+
+    if len(src_only_list) == 0 and len(unsync_list) == 0:
+        write_to_log("Folders are synced!", log_path)
 
 
 class Folder:
@@ -50,32 +74,38 @@ class Folder:
         return content
 
 
-BASE_PATH = get_base_path()
+if __name__ == '__main__':
+    src_path = str(input("Path of the source folder: "))
+    repl_path = str(input("Path of the replica folder: "))
+    log_path = str(input("Path of the log folder: "))
+    sync_interval = str(input("Interval of sync: "))
 
-srcFolder = Folder(name='source', path=os.path.join(BASE_PATH, 'source'))
-src_path = srcFolder.abs_path
-src_list = srcFolder.files_list
-src_name = srcFolder.name
+    sync_interval = sync_interval.split(" ")
+    sync_val = int(sync_interval[0])
 
-replicaFolder = Folder(name='replica', path=os.path.join(BASE_PATH, 'replica'))
-repl_path = replicaFolder.abs_path
-repl_list = replicaFolder.files_list
-repl_name = replicaFolder.name
+    sync_name = sync_interval[1].lower()
 
-dcmp = dircmp(src_path, repl_path, ignore=None, hide=None)
+    srcFolder = Folder(name='source', path=src_path)
+    src_path = srcFolder.abs_path
+    src_list = srcFolder.files_list
+    src_name = srcFolder.name
 
-# Main call
-src_path = str(input("Path of the source folder: "))
-repl_path = str(input("Path of the replica folder: "))
-log_path = str(input("Path of the log folder: "))
-sync_interval = str(input("Interval of sync: "))  # format input string to differentiate Seconds/Minutes/Hours/Days
+    replicaFolder = Folder(name='replica', path=repl_path)
+    repl_path = replicaFolder.abs_path
+    repl_list = replicaFolder.files_list
+    repl_name = replicaFolder.name
 
-# Scheduler
-schedule.every(1).minute.do(lambda: sync_folders(dcmp))
+    dcmp = dircmp(src_path, repl_path, ignore=None, hide=None)
 
-while True:
-    # Checks whether a scheduled task
-    # is pending to run or not
-    schedule.run_pending()
-    time.sleep(4)
-    # NEED TO CHECK FOR SYNC BASED ON CONTENTS WHEN THEY ARE DIFFERENT!
+    if sync_name == "seconds":
+        schedule.every(sync_val).seconds.do(sync_folders, dcmp, log_path)
+
+    elif sync_name == "minutes":
+        schedule.every(sync_val).minutes.do(sync_folders, dcmp, log_path)
+
+    elif sync_name == "hours":
+        schedule.every(sync_val).hours.do(sync_folders, dcmp, log_path)
+
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
